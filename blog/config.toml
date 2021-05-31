@@ -1,3 +1,7 @@
 baseURL = "https://thinkmassive.gitlab.io/satkube/"
 languageCode = "en-us"
 title = "SatKube"
+theme = "base16"
+
+[markup.goldmark.renderer]
+unsafe= true
