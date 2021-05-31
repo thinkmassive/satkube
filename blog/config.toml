@@ -1,4 +1,4 @@
-baseURL = "https://thinkmassive.gitlab.io/satkube/"
+baseURL = "https://satkube.com/"
 languageCode = "en-us"
 title = "SatKube"
 theme = "base16"
