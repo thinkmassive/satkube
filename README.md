@@ -23,24 +23,24 @@ Install common utilities:
       - AdministratorAccess
     - Tags:
       - Name: satkube
-    - old permissions, should delete
-      - IAMFullAccess
-      - AmazonEC2FullAccess
-      - AmazonS3FullAccess
-      - AWSCloudFormationFullAccess
-      - AmazonEKSClusterPolicy
-      - AmazonEKSWorkerNodePolicy
-      - AmazonEKSServicePolicy
-      - AmazonEKSVPCResourceController
-      - ReadOnlyAccess
 
 ```bash
+# Populate common environment variables
+export CLUSTER=satkube
+export REGION=us-east-1
+
+# Populate EKS environment variables
+export BKPR_DNS_ZONE=satkube.com
+export AWS_EKS_USER=me@example.com
+export K8S_VERSION=1.20
+#export AWS_EKS_CLUSTER=$CLUSTER
+
 # Provision EKS cluster on Fargate (adjust params as desired)
 eksctl create cluster \
-  --name satkube \
-  --region us-east-1 \
-  --zones us-east-1a,us-east-1b \
-  --version 1.20 \
+  --name $CLUSTER \
+  --region $REGION \
+  --zones ${REGION}a,${REGION}b \
+  --version $K8S_VERSION \
   --fargate
 
 # Ensure cluster creation doesn't fail early, possibly due to insufficient
@@ -50,14 +50,20 @@ eksctl create cluster \
 # Verify nodes & workload
 kubectl get nodes
 kubectl get pods -A
+
+# If you need to restore kubeconfig:
+aws eks update-kubeconfig --name=$CLUSTER
+
 ```
 
-Install the AWS Load Balancer Controller
+#### Install the AWS Load Balancer Controller
+
+Follow the [User Guide](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html) to install the AWS Load Balancer Controller. This controller manages ALBs (for `Ingress`) and NLBs (for `LoadBalancer`).
+
+This project was formerly named the AWS ALB Ingress Controller. It was renamed and continues to be improved. Code is on [GitHub](https://github.com/kubernetes-sigs/aws-load-balancer-controller).
 
 ```bash
 # Populate environment variables & display for verification
-export CLUSTER=satkube
-export REGION=us-east-1
 export AWS_ACCT_ID=$(aws iam get-user | grep -i 'arn:aws:iam' | awk -F':' '{print $6}')
 export VPC_ID=$(eksctl get cluster --name satkube -o yaml | grep VpcId | awk '{print $2}')
 echo "AWS_ACCT_ID: $AWS_ACCT_ID  VPC_ID: $VPC_ID"
@@ -96,11 +102,11 @@ helm upgrade -i aws-load-balancer-controller eks/aws-load-balancer-controller \
   --set serviceAccount.name=aws-load-balancer-controller \
   -n kube-system
 
-# Verify controller installation
+# Verify controller installation (may take a few minutes, keep watching)
 kubectl get deployment -n kube-system aws-load-balancer-controller
 ```
 
-#### Verify the Load Balancer Controller (optional)
+##### Verify the Load Balancer Controller (optional)
 
 You may verify the LBC installation (and general cluster operation) by
 deploying the `game-2048` sample app
@@ -113,7 +119,7 @@ kubectl apply -f 2048_full.yaml
 
 # when all resources are ready, visit ingress ADDRESS in a web browser
 kubectl get all -n game-2048
-kubectl get ingress/ingress-2048 -n game-2048A
+kubectl get ingress/ingress-2048 -n game-2048
 
 # clean up by deleting resources when finished
 kubectl delete -f 2048_full.yaml
@@ -123,12 +129,61 @@ eksctl delete fargateprofile --cluster $CLUSTER --region $REGION --name my-alb-s
 kubectl get all -A
 ```
 
+#### To delete EVERYTHING when finished
+
+```bash
+# This will DELETE EVERYTHING without prompting for confirmation
+eksctl delete cluster --name $CLUSTER --region $REGION
+```
+
 ---
 
 ## Bitnami Kubernetes Production Runtime
 
 "The Bitnami Kubernetes Production Runtime ([BKPR](https://kubeprod.io/)) is a collection of services that make it easy to run production workloads in Kubernetes. The services are ready-to-run and pre-integrated with each other, so they work out of the box."
 
+### BKPR Cognito Setup
+
 ```bash
-# TODO
+# Create Cognito user pool
+aws cognito-idp create-user-pool --pool-name $CLUSTER --admin-create-user-config '{"AllowAdminCreateUserOnly": true}' --user-pool-tags 'Project=satkube'
+
+# Get the Cognito pool Id
+export AWS_COGNITO_USER_POOL_ID=$(aws cognito-idp list-user-pools --max-results=1 | grep Id | awk -F'"' '{print $4}')
+
+# Create Cognito user-pool domain (note this is not the domain name defined above, no dots allowed)
+aws cognito-idp create-user-pool-domain --domain $CLUSTER --user-pool-id $AWS_COGNITO_USER_POOL_ID
+
+# Create a Cognito user
+aws cognito-idp admin-create-user \
+  --user-pool-id $AWS_COGNITO_USER_POOL_ID \
+  --username $AWS_EKS_USER \
+  --user-attributes Name=email,Value=$AWS_EKS_USER
+```
+
+You should receive an email with a temporary password to the address defined by `AWS_EKS_USER`. If you get stuck resetting the password, refer to the [BKPR Quickstart](https://github.com/bitnami/kube-prod-runtime/blob/master/docs/quickstart-eks.md#create-a-user) for guidance.
+
+At any time, if you are presented with an Amazon AWS authentication form, you can use this user account to authenticate against protected resources in BKPR.
+
+### BKPR Fargate Profile Setup
+
+```bash
+eksctl create fargateprofile --cluster $CLUSTER --name kubeprod --namespace kubeprod
+```
+
+### BKPR Deployment
+
+First [install kubeprod](https://github.com/bitnami/kube-prod-runtime/blob/master/docs/install.md#install-kubeprod)
+
+This guide was setup using **v1.8.0**
+
+```bash
+# Bootstrap your cluster with BKPR
+kubeprod install eks \
+  --email $AWS_EKS_USER \
+  --dns-zone $BKPR_DNS_ZONE \
+  --user-pool-id $AWS_COGNITO_USER_POOL_ID
+
+# Wait for all pods to enter Running state
+watch kubectl get pods -n kubeprod
 ```
