@@ -6,6 +6,14 @@ This project is a proof-of-concept to determine the feasibility of running secur
 
 ---
 
+## Costs
+
+AWS charges $0.10/hour per EKS cluster (for the control plane). The configuration below uses 3 m5.large instances, at a cost of $0.096/hour per instance.
+
+This cluster will cost more than $9.31/day ($284/month). This does not include load balancers, data transfer, storage, and potentially other costs.
+
+---
+
 ## Cluster Provisioning
 
 Install common utilities:
@@ -32,20 +40,24 @@ export REGION=us-east-1
 # Populate EKS environment variables
 export BKPR_DNS_ZONE=satkube.com
 export AWS_EKS_USER=me@example.com
-export K8S_VERSION=1.20
-#export AWS_EKS_CLUSTER=$CLUSTER
+export K8S_VERSION=1.18
+export AWS_EKS_CLUSTER=$CLUSTER
 
-# Provision EKS cluster on Fargate (adjust params as desired)
+# Get AMI ID to workaround ES broken on EKS issue
+#  details: https://github.com/awslabs/amazon-eks-ami/issues/193
+AMI_FILTERS="Name=name,Values=amazon-eks-node-1.10-v20190211"
+export AMI_ID=$(aws ec2 describe-images --owners 602401143452 --filters $AMI_FILTERS --output json | jq -r '.Images[].ImageId')
+
+# Provision EKS cluster on (adjust params as desired)
 eksctl create cluster \
   --name $CLUSTER \
   --region $REGION \
-  --zones ${REGION}a,${REGION}b \
   --version $K8S_VERSION \
-  --fargate
+  --node-ami $AMI_ID \
+  --nodes=3 \
+  --ssh-access
 
-# Ensure cluster creation doesn't fail early, possibly due to insufficient
-#  resources in the specificed AZs. Adjust params if needed, run again, then
-#  wait for cluster provisioning to complete (about 15 min).
+# Wait for cluster provisioning to complete (often ~15 min)
 
 # Verify nodes & workload
 kubectl get nodes
@@ -54,79 +66,6 @@ kubectl get pods -A
 # If you need to restore kubeconfig:
 aws eks update-kubeconfig --name=$CLUSTER
 
-```
-
-#### Install the AWS Load Balancer Controller
-
-Follow the [User Guide](https://docs.aws.amazon.com/eks/latest/userguide/aws-load-balancer-controller.html) to install the AWS Load Balancer Controller. This controller manages ALBs (for `Ingress`) and NLBs (for `LoadBalancer`).
-
-This project was formerly named the AWS ALB Ingress Controller. It was renamed and continues to be improved. Code is on [GitHub](https://github.com/kubernetes-sigs/aws-load-balancer-controller).
-
-```bash
-# Populate environment variables & display for verification
-export AWS_ACCT_ID=$(aws iam get-user | grep -i 'arn:aws:iam' | awk -F':' '{print $6}')
-export VPC_ID=$(eksctl get cluster --name satkube -o yaml | grep VpcId | awk '{print $2}')
-echo "AWS_ACCT_ID: $AWS_ACCT_ID  VPC_ID: $VPC_ID"
-
-# Enable IAM OIDC provider
-eksctl utils associate-iam-oidc-provider --region=$REGION --cluster=$CLUSTER --approve
-
-# Download & apply IAM policy
-curl -o iam_policy.json https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.2.0/docs/install/iam_policy.json
-aws iam create-policy \
-   --policy-name AWSLoadBalancerControllerIAMPolicy \
-   --policy-document file://iam_policy.json
-
-# Create IAM service account for ALB
-eksctl create iamserviceaccount \
-  --cluster=$CLUSTER \
-  --namespace=kube-system \
-  --name=aws-load-balancer-controller \
-  --attach-policy-arn=arn:aws:iam::$AWS_ACCT_ID:policy/AWSLoadBalancerControllerIAMPolicy \
-  --override-existing-serviceaccounts \
-  --approve
-
-# Install TargetGroupBinding CRD
-kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller//crds?ref=master"
-
-# Add eks-charts Helm repo & update local charts
-helm repo add eks https://aws.github.io/eks-charts
-helm repo update
-
-# Install AWS Load Balancer Controller from helm chart
-helm upgrade -i aws-load-balancer-controller eks/aws-load-balancer-controller \
-  --set clusterName=$CLUSTER \
-  --set region=$REGION \
-  --set vpcId=$VPC_ID \
-  --set serviceAccount.create=false \
-  --set serviceAccount.name=aws-load-balancer-controller \
-  -n kube-system
-
-# Verify controller installation (may take a few minutes, keep watching)
-kubectl get deployment -n kube-system aws-load-balancer-controller
-```
-
-##### Verify the Load Balancer Controller (optional)
-
-You may verify the LBC installation (and general cluster operation) by
-deploying the `game-2048` sample app
-
-```bash
-kubectl create namespace game-2048
-eksctl create fargateprofile --cluster $CLUSTER --region $REGION --name my-alb-sample-app --namespace game-2048
-curl -o 2048_full.yaml https://raw.githubusercontent.com/kubernetes-sigs/aws-load-balancer-controller/v2.1.3/docs/examples/2048/2048_full.yaml
-kubectl apply -f 2048_full.yaml
-
-# when all resources are ready, visit ingress ADDRESS in a web browser
-kubectl get all -n game-2048
-kubectl get ingress/ingress-2048 -n game-2048
-
-# clean up by deleting resources when finished
-kubectl delete -f 2048_full.yaml
-eksctl delete fargateprofile --cluster $CLUSTER --region $REGION --name my-alb-sample-app --namespace game-2048
-
-# ensure the aws-load-balancer resources remain, and all game-2048 resources are gone
-kubectl get all -A
 ```
 
 #### To delete EVERYTHING when finished
@@ -165,12 +104,6 @@ You should receive an email with a temporary password to the address defined by 
 
 At any time, if you are presented with an Amazon AWS authentication form, you can use this user account to authenticate against protected resources in BKPR.
 
-### BKPR Fargate Profile Setup
-
-```bash
-eksctl create fargateprofile --cluster $CLUSTER --name kubeprod --namespace kubeprod
-```
-
 ### BKPR Deployment
 
 First [install kubeprod](https://github.com/bitnami/kube-prod-runtime/blob/master/docs/install.md#install-kubeprod)
@@ -186,4 +119,68 @@ kubeprod install eks \
 
 # Wait for all pods to enter Running state
 watch kubectl get pods -n kubeprod
+
+# Ensure your NS records match Route53
+BKPR_DNS_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "${BKPR_DNS_ZONE}" \
+                                                         --max-items 1 \
+                                                         --query 'HostedZones[0].Id' \
+                                                         --output text)
+aws route53 get-hosted-zone --id ${BKPR_DNS_ZONE_ID} --query DelegationSet.NameServers
+```
+
+### BKPR Web UIs
+
+You can log into the BKPR web UIs using the Cognito account created earlier, `$AWS_EKS_USER`
+
+Where `DOMAIN` is the value set for `$BKPR_DNS_ZONE`:
+
+  - https://prometheus.<DOMAIN>
+  - https://kibana.<DOMAIN>
+  - https://grafana.<DOMAIN>
+
+### BKPR Teardown and Cleanup
+
+```bash
+# Uninstall BKPR
+kubecfg delete kubeprod-manifest.jsonnet
+
+# Wait for kubeprod namespace to be deleted
+kubectl get -n kubeprod challenges.acme.cert-manager.io -oname| \
+  xargs -rtI{} kubectl patch -n kubeprod {} \
+    --type=json -p='[{"op": "remove", "path": "/metadata/finalizers"}]'
+kubectl wait --for=delete ns/kubeprod --timeout=300s
+
+# Delete hosted zone from Route53
+BKPR_DNS_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name "${BKPR_DNS_ZONE}" \
+                                                         --max-items 1 \
+                                                         --query 'HostedZones[0].Id' \
+                                                         --output text)
+aws route53 list-resource-record-sets --hosted-zone-id ${BKPR_DNS_ZONE_ID} \
+                                      --query '{ChangeBatch:{Changes:ResourceRecordSets[?Type != `NS` && Type != `SOA`].{Action:`DELETE`,ResourceRecordSet:@}}}' \
+                                      --output json > changes
+
+aws route53 change-resource-record-sets --cli-input-json file://changes \
+                                        --hosted-zone-id ${BKPR_DNS_ZONE_ID} \
+                                        --query 'ChangeInfo.Id' \
+                                        --output text
+
+aws route53 delete-hosted-zone --id ${BKPR_DNS_ZONE_ID} \
+                               --query 'ChangeInfo.Id' \
+                               --output text
+
+# Delete user
+ACCOUNT=$(aws sts get-caller-identity | jq -r .Account)
+aws iam detach-user-policy --user-name "bkpr-${BKPR_DNS_ZONE}" --policy-arn "arn:aws:iam::${ACCOUNT}:policy/bkpr-${BKPR_DNS_ZONE}"
+aws iam delete-policy --policy-arn "arn:aws:iam::${ACCOUNT}:policy/bkpr-${BKPR_DNS_ZONE}"
+ACCESS_KEY_ID=$(jq -r .externalDns.aws_access_key_id kubeprod-autogen.json)
+aws iam delete-access-key --user-name "bkpr-${BKPR_DNS_ZONE}" --access-key-id "${ACCESS_KEY_ID}"
+aws iam delete-user --user-name "bkpr-${BKPR_DNS_ZONE}"
+
+# Delete app client
+USER_POOL=$(jq -r .oauthProxy.aws_user_pool_id kubeprod-autogen.json)
+CLIENT_ID=$(jq -r .oauthProxy.client_id kubeprod-autogen.json)
+aws cognito-idp delete-user-pool-client --user-pool-id "${USER_POOL}" --client-id "${CLIENT_ID}"
+
+# Delete EKS cluster
+eksctl delete cluster --name ${AWS_EKS_CLUSTER}
 ```
