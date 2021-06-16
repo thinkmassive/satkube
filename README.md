@@ -4,6 +4,11 @@
 
 This project is a proof-of-concept to determine the feasibility of running secure cloud-native Bitcoin infrastructure.
 
+  - [Costs](#costs)
+  - [Cluster provisioning](#cluster-provisioning)
+  - [Bitnami Kubernetes Production Runtime](#bitnami-kubernetes-production-runtime) (BKPR)
+  - [Bitnami KubeApps](#bitnami-kubeapps)
+
 ---
 
 ## Costs
@@ -184,3 +189,54 @@ aws cognito-idp delete-user-pool-client --user-pool-id "${USER_POOL}" --client-i
 # Delete EKS cluster
 eksctl delete cluster --name ${AWS_EKS_CLUSTER}
 ```
+
+---
+
+## Bitnami KubeApps
+
+[KubeApps](https://kubeapps.com/) is a Kubernetes application dashboard from Bitnami.
+
+### Kubeapps Installation
+
+```bash
+kubectl create namespace kubeapps
+helm repo add bitnami https://charts.bitnami.com/bitnami
+
+helm install kubeapps --namespace kubeapps \
+  --set ingress.enabled=true \
+  --set ingress.tls=true \
+  --set ingress.certManager=true \
+  --set ingress.hostname=kubeapps.$BKPR_DNS_ZONE \
+  --set mongodb.metrics.enabled=true \
+  bitnami/kubeapps
+```
+
+For a full list of parameters, refer to the [helm chart docs](https://hub.kubeapps.com/charts/bitnami/kubeapps)
+
+When all pods are running, the web UI should be available at:
+  - https://kubeapps.<DOMIAN>
+
+### Kubeapps Authentication
+
+The following creates a cluster-admin user for TEST PURPOSES ONLY
+
+```bash
+# Create an operator (cluster-admin) account
+kubectl create serviceaccount kubeapps-operator
+kubectl create clusterrolebinding kubeapps-operator \
+  --clusterrole=cluster-admin \
+  --serviceaccount=default:kubeapps-operator
+
+# Get an access token to use w/webUI
+kubectl get secret -o jsonpath='{.data.token}' \
+    $(kubectl get serviceaccount kubeapps-operator -o jsonpath=' {.secrets[].name}') \
+    | base64 --decode ; echo
+```
+
+Todo
+  - [Install OIDC provider](https://github.com/kubeapps/kubeapps/blob/master/docs/user/using-an-OIDC-provider.md)
+  - [Assign roles for apps](https://github.com/kubeapps/kubeapps/blob/master/docs/user/access-control.md#assigning-kubeapps-user-roles)
+
+### Kubeapps Usage
+
+You can install charts from the [Kubeapps Hub](https://hub.kubeapps.com/charts/bitnami)
