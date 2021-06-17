@@ -40,25 +40,21 @@ Install common utilities:
 ```bash
 # Populate common environment variables
 export CLUSTER=satkube
-export REGION=us-east-1
+export REGION=us-east-2
 
 # Populate EKS environment variables
-export BKPR_DNS_ZONE=satkube.com
-export AWS_EKS_USER=me@example.com
 export K8S_VERSION=1.18
-export AWS_EKS_CLUSTER=$CLUSTER
+export BKPR_DNS_ZONE=satkube.com
+export ADMIN_EMAIL=me@example.com
 
-# Get AMI ID to workaround ES broken on EKS issue
-#  details: https://github.com/awslabs/amazon-eks-ami/issues/193
-AMI_FILTERS="Name=name,Values=amazon-eks-node-1.10-v20190211"
-export AMI_ID=$(aws ec2 describe-images --owners 602401143452 --filters $AMI_FILTERS --output json | jq -r '.Images[].ImageId')
+# Review variables before applying changes
+echo -e "CLUSTER: $CLUSTER\nREGION: $REGION\nK8S_VERSION: $K8S_VERSION\nBKPR_DNS_ZONE: $BKPR_DNS_ZONE\nADMIN_EMAIL: $ADMIN_EMAIL"
 
 # Provision EKS cluster on (adjust params as desired)
 eksctl create cluster \
   --name $CLUSTER \
   --region $REGION \
   --version $K8S_VERSION \
-  --node-ami $AMI_ID \
   --nodes=3 \
   --ssh-access
 
@@ -101,11 +97,11 @@ aws cognito-idp create-user-pool-domain --domain $CLUSTER --user-pool-id $AWS_CO
 # Create a Cognito user
 aws cognito-idp admin-create-user \
   --user-pool-id $AWS_COGNITO_USER_POOL_ID \
-  --username $AWS_EKS_USER \
-  --user-attributes Name=email,Value=$AWS_EKS_USER
+  --username $ADMIN_EMAIL \
+  --user-attributes Name=email,Value=$ADMIN_EMAIL
 ```
 
-You should receive an email with a temporary password to the address defined by `AWS_EKS_USER`. If you get stuck resetting the password, refer to the [BKPR Quickstart](https://github.com/bitnami/kube-prod-runtime/blob/master/docs/quickstart-eks.md#create-a-user) for guidance.
+You should receive an email with a temporary password to the address defined by `ADMIN_EMAIL`. If you get stuck resetting the password, refer to the [BKPR Quickstart](https://github.com/bitnami/kube-prod-runtime/blob/master/docs/quickstart-eks.md#create-a-user) for guidance.
 
 At any time, if you are presented with an Amazon AWS authentication form, you can use this user account to authenticate against protected resources in BKPR.
 
@@ -118,7 +114,7 @@ This guide was setup using **v1.8.0**
 ```bash
 # Bootstrap your cluster with BKPR
 kubeprod install eks \
-  --email $AWS_EKS_USER \
+  --email $ADMIN_EMAIL \
   --dns-zone $BKPR_DNS_ZONE \
   --user-pool-id $AWS_COGNITO_USER_POOL_ID
 
@@ -135,7 +131,7 @@ aws route53 get-hosted-zone --id ${BKPR_DNS_ZONE_ID} --query DelegationSet.NameS
 
 ### BKPR Web UIs
 
-You can log into the BKPR web UIs using the Cognito account created earlier, `$AWS_EKS_USER`
+You can log into the BKPR web UIs using the Cognito account created earlier, `$ADMIN_EMAIL`
 
 Where `DOMAIN` is the value set for `$BKPR_DNS_ZONE`:
 
@@ -187,7 +183,7 @@ CLIENT_ID=$(jq -r .oauthProxy.client_id kubeprod-autogen.json)
 aws cognito-idp delete-user-pool-client --user-pool-id "${USER_POOL}" --client-id "${CLIENT_ID}"
 
 # Delete EKS cluster
-eksctl delete cluster --name ${AWS_EKS_CLUSTER}
+eksctl delete cluster --name $CLUSTER
 ```
 
 ---
