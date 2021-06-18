@@ -11,6 +11,23 @@ This project is a proof-of-concept to determine the feasibility of running secur
 
 ---
 
+## Quickstart
+
+```bash
+chmod +x ??-*.sh
+./00-prerequisites.sh
+./01-eks-provision.sh
+./02-bkpr-deploy.sh
+```
+
+### Uninstall
+
+```bash
+./99-uninstall.sh
+```
+
+---
+
 ## Costs
 
 AWS charges $0.10/hour per EKS cluster (for the control plane). The configuration below uses 3 m5.large instances, at a cost of $0.096/hour per instance.
@@ -89,6 +106,8 @@ eksctl delete cluster --name $CLUSTER --region $REGION
 
 "The Bitnami Kubernetes Production Runtime ([BKPR](https://kubeprod.io/)) is a collection of services that make it easy to run production workloads in Kubernetes. The services are ready-to-run and pre-integrated with each other, so they work out of the box."
 
+The following commands can be executed by running `02-bkpr-deploy.sh` in this repo.
+
 ### BKPR Cognito Setup
 
 ```bash
@@ -141,13 +160,15 @@ aws route53 get-hosted-zone --id ${BKPR_DNS_ZONE_ID} --query DelegationSet.NameS
 
 You can log into the BKPR web UIs using the Cognito account created earlier, `$ADMIN_EMAIL`
 
-Where `DOMAIN` is the value set for `$BKPR_DNS_ZONE`:
+Where `<DNS_ZONE>` is the value set for `$DNS_ZONE`:
 
-  - https://prometheus.DOMAIN
-  - https://kibana.DOMAIN
-  - https://grafana.DOMAIN
+  - https://prometheus. &lt;DNS_ZONE&gt;
+  - https://kibana. &lt;DNS_ZONE&gt;
+  - https://grafana. &lt;DNS_ZONE&gt;
 
 ### BKPR Teardown and Cleanup
+
+The following commands can be executed by running `99-uninstall.sh` in this repo.
 
 ```bash
 # Uninstall BKPR
