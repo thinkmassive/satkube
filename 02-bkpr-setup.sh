@@ -37,7 +37,6 @@ read -n 1 -s -r keypress
 
 echo "Bootstrapping the cluster with BKPR"
 kubeprod install eks \
-  --region $REGION \
   --email $ADMIN_EMAIL \
   --dns-zone $DNS_ZONE \
   --user-pool-id $COGNITO_USER_POOL_ID
