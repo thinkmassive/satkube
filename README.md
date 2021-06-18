@@ -37,39 +37,46 @@ Install common utilities:
     - Tags:
       - Name: satkube
 
+The following commands can be executed by running `01-provision.sh` in this repo.
+
+First, populate environment variables:
+
 ```bash
-# Populate common environment variables
 export CLUSTER=satkube
 export REGION=us-east-2
-
-# Populate EKS environment variables
 export K8S_VERSION=1.18
-export BKPR_DNS_ZONE=satkube.com
+export NODE_COUNT=3
+export DNS_ZONE=citadelic.org
 export ADMIN_EMAIL=me@example.com
+```
 
-# Review variables before applying changes
-echo -e "CLUSTER: $CLUSTER\nREGION: $REGION\nK8S_VERSION: $K8S_VERSION\nBKPR_DNS_ZONE: $BKPR_DNS_ZONE\nADMIN_EMAIL: $ADMIN_EMAIL"
+Review all variables, then provision the EKS cluster:
 
-# Provision EKS cluster on (adjust params as desired)
+```bash
 eksctl create cluster \
   --name $CLUSTER \
   --region $REGION \
   --version $K8S_VERSION \
   --nodes=3 \
   --ssh-access
-
-# Wait for cluster provisioning to complete (often ~15 min)
-
-# Verify nodes & workload
-kubectl get nodes
-kubectl get pods -A
-
-# If you need to restore kubeconfig:
-aws eks update-kubeconfig --name=$CLUSTER
-
 ```
 
-#### To delete EVERYTHING when finished
+Wait for cluster provisioning to complete, which often takes about 15 minutes. Then verify the nodes are ready and pods are running:
+
+```bash
+kubectl get nodes
+kubectl get pods -A
+```
+
+Your kubeconfig should automatically be updated, but in case you need to manually restore it:
+
+```bash
+aws eks update-kubeconfig --name=$CLUSTER --region=$REGION
+```
+
+#### EKS Clean up
+
+To delete EVERYTHING created by eksctl when finished (note that additional AWS resources might be created by future steps, so those should either be deleted before this or cleaned up manually)
 
 ```bash
 # This will DELETE EVERYTHING without prompting for confirmation
