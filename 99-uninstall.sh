@@ -1,8 +1,9 @@
 #!/bin/bash
 . ./00-prerequisites.sh
 
+# All are TRUE by default EXCEPT Route53 because propagation is too slow
 UNINSTALL_BKPR=${UNINSTALL_BKPR:-true}
-UNINSTALL_ROUTE53=${UNINSTALL_ROUTE53:-true}
+UNINSTALL_ROUTE53=${UNINSTALL_ROUTE53:-false}
 UNINSTALL_IAM=${UNINSTALL_IAM:-true}
 UNINSTALL_COGNITO=${UNINSTALL_COGNITO:-true}
 UNINSTALL_EKS=${UNINSTALL_EKS:-true}
