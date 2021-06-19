@@ -3,7 +3,8 @@
 
 # All are TRUE by default EXCEPT Route53 because propagation is too slow
 UNINSTALL_BKPR=${UNINSTALL_BKPR:-true}
-UNINSTALL_ROUTE53=${UNINSTALL_ROUTE53:-false}
+UNINSTALL_ROUTE53_RECORDS=${UNINSTALL_ROUTE53_RECORDS:-true}
+UNINSTALL_ROUTE53_ZONE=${UNINSTALL_ROUTE53_ZONE:-false}
 UNINSTALL_IAM=${UNINSTALL_IAM:-true}
 UNINSTALL_COGNITO=${UNINSTALL_COGNITO:-true}
 UNINSTALL_EKS=${UNINSTALL_EKS:-true}
@@ -35,13 +36,18 @@ if [ $UNINSTALL_BKPR = true ]; then
   kubectl wait --for=delete ns/kubeprod --timeout=300s
 fi
   
-if [ $UNINSTALL_ROUTE53 = true ]; then
-  echo -e "\nROUTE53 CLEANUP"
+if [ $UNINSTALL_ROUTE53_RECORDS = true ]; then
+  echo -e "\nROUTE53 RECORDS CLEANUP"
   echo -n "Deleting Route53 hosted zone id: "
   DNS_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name="$DNS_ZONE" --max-items=1 --query='HostedZones[0].Id' --output=text)
   echo $DNS_ZONE_ID
   aws route53 list-resource-record-sets --hosted-zone-id=$DNS_ZONE_ID --query='{ChangeBatch:{Changes:ResourceRecordSets[?Type != `NS` && Type != `SOA`].{Action:`DELETE`,ResourceRecordSet:@}}}' --output=json > changes
   aws route53 change-resource-record-sets --cli-input-json file://changes --hosted-zone-id=$DNS_ZONE_ID --query='ChangeInfo.Id' --output=text
+fi
+if [ $UNINSTALL_ROUTE53_ZONE = true ]; then
+  echo -e "\nROUTE53 ZONE CLEANUP"
+  DNS_ZONE_ID=$(aws route53 list-hosted-zones-by-name --dns-name="$DNS_ZONE" --max-items=1 --query='HostedZones[0].Id' --output=text)
+  echo $DNS_ZONE_ID
   aws route53 delete-hosted-zone --id=$DNS_ZONE_ID --query='ChangeInfo.Id' --output=text
 fi
   
@@ -77,13 +83,14 @@ if [ $UNINSTALL_COGNITO = true ]; then
   fi
 fi
 
-echo -e "\nUninstall Complete\n"
+echo -e "\n\nUninstall Complete\n"
 echo "Remaining kubernetes resources:"
 kubectl get all -A
   
-echo -e "\n\n!!!! ATTENTION !!!!\nThe following files remain:\n"
+echo -e "\n\nDo you want to delete the following kubeprod config files?"
 ls -l kubeprod-*.json*
-echo -e "\n!!!!!!!!!!!!!!!!!!!\n"
+echo -e "\n(if kept, Cognito pool will be reused by BKPR, may cause issues!)\n"
+proceed_or_exit
 
 if [ $UNINSTALL_EKS = true ]; then  
   echo -n "Delete EKS cluster?"
