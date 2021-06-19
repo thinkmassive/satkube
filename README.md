@@ -11,6 +11,12 @@ This project is a proof-of-concept to determine the feasibility of running secur
 
 ---
 
+## ATTENTION
+
+This project is under active development. The only guarantee is this branch will experience frequent commit reorgs until this notice is removed. Use at your own peril!
+
+---
+
 ## Quickstart
 
 ```bash
