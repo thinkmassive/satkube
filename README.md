@@ -20,11 +20,26 @@ This project is under active development. The only guarantee is this branch will
 ## Quickstart
 
 ```bash
-chmod +x ??-*.sh
+# clone this repo, including submodules, and enter the project root
+git clone --recurse-submodules https://gitlab.com:thinkmassive/satkube
+cd satkube
+
+# if you cloned w/o submodules, fetch them now:
+git submodule init
+git submodule update
+
+# Verify software dependencies are met (resolve before proceeding)
 ./00-prerequisites.sh
+
+# Provision an Amazon EKS cluster
 ./01-eks-provision.sh
+
+# Deploy Bitname Kubernetes Production Runtime
 ./02-bkpr-deploy.sh
-./03-helm-install.sh
+
+# Install bitcoind & lnd from helm charts
+./03-helm-bitcoind.sh
+./04-helm-lnd.sh
 ```
 
 ### Uninstall
