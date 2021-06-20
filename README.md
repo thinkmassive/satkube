@@ -24,6 +24,7 @@ chmod +x ??-*.sh
 ./00-prerequisites.sh
 ./01-eks-provision.sh
 ./02-bkpr-deploy.sh
+./03-helm-install.sh
 ```
 
 ### Uninstall
