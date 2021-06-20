@@ -1,10 +1,10 @@
 ---
 title: "EKS Cluster Provisioning"
-date: 2021-06-17T20:29:31Z
+date: 2021-06-18T20:29:31Z
 draft: false
----
+summary: "Provisioning an Amazon EKS cluster to host our SatKube installation"
 
-Amazon EKS cluster provisioning is complete, but it will be documented at a later time. Please refer to the [readme](https://gitlab.com/thinkmassive/satkube/-/blob/main/README.md) for guidance in the meantime.
+---
 
 Install common utilities:
 
