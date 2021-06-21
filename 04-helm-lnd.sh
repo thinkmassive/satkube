@@ -28,8 +28,12 @@ if [ "$INSTALL_NS" == "true" ]; then
 fi
 
 if [ "$INSTALL_LND" == "true" ]; then
-  echo "INSTALLING LND"
   cd charts/galoy/charts/lnd
+
+  echo "Updating helm chart dependencies"
+  helm dependency update
+
+  echo -e "\nINSTALLING LND"
   helm install lnd . -f $VALUES -n $NS
 
   echo -n "Fetching lnd pod: "
