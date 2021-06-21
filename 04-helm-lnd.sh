@@ -34,7 +34,7 @@ if [ "$INSTALL_LND" == "true" ]; then
   helm dependency update
 
   echo -e "\nINSTALLING LND"
-  helm install lnd . -f $VALUES -n $NS
+  helm install --debug lnd . -f $VALUES -n $NS
 
   echo -n "Fetching lnd pod: "
   LND_POD=$(kubectl get pod -n $NS -l "app.kubernetes.io/name=lnd" -o jsonpath="{ .items[0].metadata.name }")

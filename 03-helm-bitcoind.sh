@@ -30,7 +30,7 @@ fi
 if [ "$INSTALL_BITCOIND" == "true" ]; then
   echo "INSTALLING BITCOIND"
   cd charts/galoy/charts/bitcoind
-  helm install bitcoind . -f $VALUES -n $NS
+  helm install --debug bitcoind . -f $VALUES -n $NS
 
   # Follow instructions in Notes to test RPC
   echo -n "Fetching bitcoind pod: "
