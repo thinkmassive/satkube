@@ -39,8 +39,6 @@ if [ "$INSTALL_LND" == "true" ]; then
   echo -n "Fetching lnd pod: "
   LND_POD=$(kubectl get pod -n $NS -l "app.kubernetes.io/name=lnd" -o jsonpath="{ .items[0].metadata.name }")
   echo $LND_POD
-  echo "Forwarding port to lnd... "
-  kubectl port-forward -n $NS $LND_POD 9735 &
 
   cd -
 fi
