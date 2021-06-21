@@ -29,7 +29,7 @@ fi
 
 if [ "$INSTALL_BITCOIND" == "true" ]; then
   echo "INSTALLING BITCOIND"
-  cd galoy-charts/charts/bitcoind
+  cd charts/galoy/charts/bitcoind
   helm install bitcoind . -f $VALUES -n $NS
 
   # Follow instructions in Notes to test RPC

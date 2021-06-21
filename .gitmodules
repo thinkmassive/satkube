@@ -2,5 +2,5 @@
 	path = blog/themes/base16
 	url = https://github.com/htdvisser/hugo-base16-theme.git
 [submodule "galoy-charts"]
-	path = galoy-charts
+	path = charts/galoy
 	url = https://github.com/GaloyMoney/charts

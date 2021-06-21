@@ -29,7 +29,7 @@ fi
 
 if [ "$INSTALL_LND" == "true" ]; then
   echo "INSTALLING LND"
-  cd galoy-charts/charts/lnd
+  cd charts/galoy/charts/lnd
   helm install lnd . -f $VALUES -n $NS
 
   echo -n "Fetching lnd pod: "
