@@ -4,3 +4,6 @@
 [submodule "galoy-charts"]
 	path = charts/galoy
 	url = https://github.com/GaloyMoney/charts
+[submodule "blog/themes/hugo-theme-techdoc"]
+	path = blog/themes/hugo-theme-techdoc
+	url = https://github.com/thingsym/hugo-theme-techdoc.git
