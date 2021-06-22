@@ -1,5 +1,5 @@
 ---
-title: "Initial Security Assessment"
+title: "Initial Assessment"
 date: 2021-06-21T21:00:00Z
 draft: false
 summary: "An overview of the hardening efforts already completed, and some ideas for future security improvements."
